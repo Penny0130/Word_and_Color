@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>長者色彩認知挑戰遊戲</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f0fdf4; /* 淺綠色舒適背景 */
+            user-select: none;
+            touch-action: manipulation; /* 改善觸控體驗，禁止雙擊放大 */
+        }
+
+        /* 針對白字+淺色背景(如黃色)的增強陰影，確保長輩能看清楚白字 */
+        .text-strong-shadow {
+            text-shadow: 0px 4px 12px rgba(0, 0, 0, 0.8), 0px 0px 4px rgba(0,0,0,0.5);
+        }
+
+        .card-pop {
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 正確與錯誤動畫 */
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .anim-correct { animation: bounce 0.5s ease-in-out; }
+        .anim-wrong { animation: shake 0.4s ease-in-out; }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-gray-800 relative">
+
+    <!-- 全螢幕按鈕 -->
+    <button onclick="toggleFullScreen()" class="absolute top-4 right-4 bg-white/80 hover:bg-white text-gray-800 font-bold py-2 px-4 rounded-xl shadow border border-gray-200 z-50 flex items-center gap-2 transition-colors backdrop-blur-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+        <span class="hidden sm:inline">全螢幕</span>
+    </button>
+
+    <!-- 主選單畫面 -->
+    <div id="menu-screen" class="flex-1 flex flex-col items-center justify-center p-6 mt-12 sm:mt-0">
+        <!-- 標題 -->
+        <h1 class="text-4xl sm:text-6xl font-black text-green-500 mb-4 text-center tracking-wide">色彩認知大挑戰</h1>
+        <p class="text-xl sm:text-2xl text-gray-700 mb-1 text-center max-w-2xl font-bold">
+            考驗大腦專注力，請幫助我們找出「字」與「顏色」不相符的錯誤圖卡！
+        </p>
+        <!-- 新增遊戲設計者 -->
+        <p class="text-base sm:text-lg text-gray-500 mb-8 text-center font-bold">遊戲設計: 丁琬珮老師</p>
+        
+        <!-- 新增時間設定按鈕 -->
+        <div class="mb-6 flex gap-2 sm:gap-3 justify-center flex-wrap items-center bg-white p-4 rounded-2xl shadow-sm border border-green-100">
+            <span class="text-lg font-bold text-gray-700 ml-2">挑戰時間：</span>
+            <button onclick="setTime(0)" id="btn-time-0" class="time-btn bg-gray-100 text-gray-600 hover:bg-gray-200 py-2 px-4 rounded-xl font-bold transition-colors">無限制</button>
+            <button onclick="setTime(5)" id="btn-time-5" class="time-btn bg-gray-100 text-gray-600 hover:bg-gray-200 py-2 px-4 rounded-xl font-bold transition-colors">5秒</button>
+            <button onclick="setTime(10)" id="btn-time-10" class="time-btn bg-gray-100 text-gray-600 hover:bg-gray-200 py-2 px-4 rounded-xl font-bold transition-colors">10秒</button>
+            <button onclick="setTime(15)" id="btn-time-15" class="time-btn bg-green-500 text-white py-2 px-4 rounded-xl font-bold transition-colors">15秒</button>
+        </div>
+        
+        <div class="flex flex-col gap-6 w-full max-w-md">
+            <button onclick="startGame(1)" class="w-full bg-blue-500 hover:bg-blue-600 text-white text-3xl font-bold py-6 px-8 rounded-3xl shadow-lg shadow-blue-200 transition-transform active:scale-95 border-b-8 border-blue-700 flex flex-col items-center">
+                <span>第一關：文字變色</span>
+                <span class="text-lg font-normal mt-2 opacity-90">白底色卡，找出顏色錯誤的字</span>
+            </button>
+            <button onclick="startGame(2)" class="w-full bg-orange-500 hover:bg-orange-600 text-white text-3xl font-bold py-6 px-8 rounded-3xl shadow-lg shadow-orange-200 transition-transform active:scale-95 border-b-8 border-orange-700 flex flex-col items-center">
+                <span>第二關：背景變色 (2張)</span>
+                <span class="text-lg font-normal mt-2 opacity-90">彩色底白字，找出描述錯誤的卡</span>
+            </button>
+            <button onclick="startGame(3)" class="w-full bg-purple-500 hover:bg-purple-600 text-white text-3xl font-bold py-6 px-8 rounded-3xl shadow-lg shadow-purple-200 transition-transform active:scale-95 border-b-8 border-purple-700 flex flex-col items-center">
+                <span>第三關：進階挑戰 (3張)</span>
+                <span class="text-lg font-normal mt-2 opacity-90">三張彩色卡，找出一張錯誤的卡</span>
+            </button>
+            <button onclick="startGame(4)" class="w-full bg-pink-500 hover:bg-pink-600 text-white text-3xl font-bold py-6 px-8 rounded-3xl shadow-lg shadow-pink-200 transition-transform active:scale-95 border-b-8 border-pink-700 flex flex-col items-center">
+                <span>第四關：大聲唸出來 (4張)</span>
+                <span class="text-lg font-normal mt-2 opacity-90">白底色卡，大聲唸出字或顏色</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 遊戲畫面 (預設隱藏) -->
+    <div id="game-screen" class="hidden flex-1 flex-col items-center justify-start p-4 sm:p-8 mt-12 sm:mt-0 w-full max-w-6xl mx-auto h-full">
+        <!-- 頂部控制列 -->
+        <div class="w-full flex justify-between items-center mb-4 sm:mb-8">
+            <button onclick="returnToMenu()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-2xl shadow-sm transition-colors text-lg sm:text-xl">
+                返回選單
+            </button>
+            <div class="flex items-center gap-4">
+                <!-- 計時與暫停按鈕已移至下方 -->
+            </div>
+        </div>
+
+        <!-- 關卡標題與指示 -->
+        <h2 id="level-title" class="text-3xl sm:text-5xl font-black text-gray-800 mb-2 text-center drop-shadow-sm">關卡名稱</h2>
+        <p id="instruction-text" class="text-xl sm:text-3xl text-blue-600 font-bold mb-4 sm:mb-8 text-center bg-blue-50 px-6 py-3 rounded-2xl border-2 border-blue-100 shadow-sm"></p>
+        
+        <!-- 卡牌顯示區 -->
+        <div id="cards-container" class="flex flex-wrap items-center justify-center gap-4 sm:gap-12 w-full flex-1 min-h-[400px]">
+            <!-- 卡牌會由 JS 動態產生 -->
+        </div>
+        
+        <!-- 底部控制與按鈕區 -->
+        <div class="mt-8 mb-8 flex flex-col items-center gap-6">
+            <!-- 第一/二/三關的計時、暫停與音效區 -->
+            <div id="timer-controls" class="hidden flex items-center gap-4 bg-white/80 p-3 rounded-3xl shadow-sm border border-gray-100">
+                <button onclick="toggleMute()" id="mute-btn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-2xl h-12 w-12 rounded-full shadow-sm transition-colors flex items-center justify-center" title="音效開關">
+                    🔊
+                </button>
+                <span id="timer-display" class="text-3xl font-black text-red-500 bg-red-50 px-5 py-2 rounded-xl border-2 border-red-200 shadow-inner">0s</span>
+                <button onclick="togglePause()" id="pause-btn" class="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-3 px-6 rounded-2xl shadow-md transition-colors text-lg sm:text-xl">
+                    暫停
+                </button>
+            </div>
+
+            <!-- 第四關專用下一題按鈕 -->
+            <button id="next-btn" onclick="nextQuestion()" class="hidden bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-10 rounded-full shadow-lg shadow-blue-200 transition-transform active:scale-95 text-2xl">
+                下一題
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 定義飽和的顏色陣列，避免灰色地帶，確保長輩容易辨識
+        const COLORS = [
+            { name: '紅', hex: '#E53935' }, // 飽和紅
+            { name: '藍', hex: '#1E88E5' }, // 飽和藍
+            { name: '綠', hex: '#43A047' }, // 飽和綠
+            { name: '黃', hex: '#FDD835' }, // 明亮黃 (配合黑陰影白字)
+            { name: '黑', hex: '#212121' }, // 深黑
+            { name: '紫', hex: '#8E24AA' }  // 飽和紫
+        ];
+
+        let currentLevel = 1;
+        let isWaitingForNext = false; // 防止重複點擊
+        
+        // 新增全域變數處理時間與暫停
+        let selectedTimeMode = 15; // 預設改為 15秒 (0 = 無限制)
+        let timerInterval = null;
+        let timeLeft = 0;
+        let isPaused = false;
+
+        // 音效控制變數
+        let isMuted = false;
+        let audioInitialized = false;
+        let synth = null;
+
+        // 初始化音效 (由使用者首次點擊觸發)
+        function initAudio() {
+            if (!audioInitialized) {
+                Tone.start();
+                synth = new Tone.Synth({
+                    envelope: { attack: 0.01, decay: 0.05, sustain: 0, release: 0.05 }
+                }).toDestination();
+                synth.volume.value = -10; // 降低一點音量避免刺耳
+                audioInitialized = true;
+            }
+        }
+
+        // 播放滴答聲
+        function playTickSound() {
+            if (!isMuted && audioInitialized && synth) {
+                synth.triggerAttackRelease("C5", "16n"); // 產生輕快且有緊張感的提示音
+            }
+        }
+
+        // 切換音效開關
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('mute-btn').innerText = isMuted ? '🔇' : '🔊';
+        }
+
+        // 全螢幕切換
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`全螢幕錯誤: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // 設定時間難度
+        function setTime(seconds) {
+            selectedTimeMode = seconds;
+            // 更新按鈕樣式
+            document.querySelectorAll('.time-btn').forEach(btn => {
+                btn.classList.remove('bg-green-500', 'text-white');
+                btn.classList.add('bg-gray-100', 'text-gray-600');
+            });
+            const activeBtn = document.getElementById(`btn-time-${seconds}`);
+            activeBtn.classList.remove('bg-gray-100', 'text-gray-600');
+            activeBtn.classList.add('bg-green-500', 'text-white');
+        }
+
+        // 切換暫停狀態
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pause-btn');
+            if (isPaused) {
+                btn.innerText = '繼續';
+                btn.classList.remove('bg-yellow-400', 'hover:bg-yellow-500', 'text-yellow-900');
+                btn.classList.add('bg-blue-500', 'hover:bg-blue-600', 'text-white');
+            } else {
+                btn.innerText = '暫停';
+                btn.classList.remove('bg-blue-500', 'hover:bg-blue-600', 'text-white');
+                btn.classList.add('bg-yellow-400', 'hover:bg-yellow-500', 'text-yellow-900');
+            }
+        }
+
+        // 啟動計時器
+        function startTimer() {
+            clearInterval(timerInterval);
+            isPaused = false;
+            
+            const btn = document.getElementById('pause-btn');
+            btn.innerText = '暫停';
+            btn.classList.remove('bg-blue-500', 'hover:bg-blue-600', 'text-white');
+            btn.classList.add('bg-yellow-400', 'hover:bg-yellow-500', 'text-yellow-900');
+
+            // 第四關隱藏計時與暫停功能
+            if (currentLevel === 4) {
+                document.getElementById('timer-controls').classList.add('hidden');
+                document.getElementById('timer-controls').classList.remove('flex');
+                return;
+            }
+            
+            // 第一、二、三關確保控制列顯示
+            document.getElementById('timer-controls').classList.remove('hidden');
+            document.getElementById('timer-controls').classList.add('flex');
+            
+            timeLeft = selectedTimeMode;
+            updateTimerDisplay();
+
+            // 若為無限制模式，不啟動倒數，但依然顯示暫停鍵
+            if (selectedTimeMode === 0) {
+                return;
+            }
+
+            timerInterval = setInterval(() => {
+                if (isPaused || isWaitingForNext) return;
+                timeLeft--;
+                updateTimerDisplay();
+                
+                // 若時間大於0且非第四關，則播放倒數音效
+                if (currentLevel !== 4 && timeLeft > 0) {
+                    playTickSound();
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeout();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const display = document.getElementById('timer-display');
+            if (selectedTimeMode === 0) {
+                display.innerText = "無限";
+            } else {
+                display.innerText = timeLeft + "s";
+            }
+        }
+
+        function handleTimeout() {
+            isWaitingForNext = false; // 讓長輩依然可以點擊作答
+            const instEl = document.getElementById('instruction-text');
+            instEl.innerText = "⏰ 時間到！請看仔細後選出答案";
+        }
+
+        // 切換畫面
+        function startGame(level) {
+            initAudio(); // 在點擊開始時初始化音訊 (必須由使用者動作觸發)
+            
+            currentLevel = level;
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('game-screen').classList.add('flex');
+            
+            // 處理第四關按鈕顯示
+            if (level === 4) {
+                document.getElementById('next-btn').classList.remove('hidden');
+            } else {
+                document.getElementById('next-btn').classList.add('hidden');
+            }
+
+            // 設定標題與指示
+            const titleEl = document.getElementById('level-title');
+            const instEl = document.getElementById('instruction-text');
+            
+            if (level === 1) {
+                titleEl.innerText = '第一關：文字變色';
+                instEl.innerText = '哪張卡的「字義」與「文字顏色」不同？';
+            } else if (level === 2) {
+                titleEl.innerText = '第二關：背景變色';
+                instEl.innerText = '哪張卡的「字義」與「底色」不同？';
+            } else if (level === 3) {
+                titleEl.innerText = '第三關：進階挑戰';
+                instEl.innerText = '三張卡中，哪張「字義」與「底色」不同？';
+            } else {
+                titleEl.innerText = '第四關：大聲唸出來';
+                instEl.innerText = '請大聲唸出卡片上的「字」或「顏色」！(本關無須點擊)';
+            }
+
+            nextQuestion();
+        }
+
+        function returnToMenu() {
+            clearInterval(timerInterval);
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('flex');
+            document.getElementById('menu-screen').classList.remove('hidden');
+        }
+
+        // 陣列洗牌函式 (確保顏色不重複使用)
+        function shuffleArray(array) {
+            let arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function nextQuestion() {
+            isWaitingForNext = false;
+            
+            // 恢復提示文字 (避免被 Timeout 文字覆蓋)
+            const instEl = document.getElementById('instruction-text');
+            if (currentLevel === 1) instEl.innerText = '請點擊【字】與【顏色】不符的卡牌！';
+            else if (currentLevel === 2) instEl.innerText = '請點擊【字】與【底色】不符的卡牌！';
+            else if (currentLevel === 3) instEl.innerText = '三張卡中，哪張【字】與【底色】不同？';
+            else instEl.innerText = '請大聲唸出卡片上的【字】或【顏色】！(本關無須點擊)';
+
+            const container = document.getElementById('cards-container');
+            container.innerHTML = ''; // 清空卡牌
+            
+            let numCards = (currentLevel === 4) ? 4 : (currentLevel === 3) ? 3 : 2;
+            let targetIndex = Math.floor(Math.random() * numCards); // 決定哪一張是「錯誤(需點擊)」的卡片
+            
+            let cardsData = [];
+
+            if (currentLevel === 4) {
+                // 第四關特別邏輯：一次出 4 張白底卡，文字和文字顏色不重複且隨機搭配
+                let shuffledWords = shuffleArray(COLORS).slice(0, 4);
+                let shuffledFonts = shuffleArray(COLORS).slice(0, 4);
+                
+                for (let i = 0; i < 4; i++) {
+                    cardsData.push({
+                        isTarget: false, // 第四關不需要點擊判定
+                        bgHex: '#FFFFFF',
+                        fontHex: shuffledFonts[i].hex,
+                        wordName: shuffledWords[i].name
+                    });
+                }
+            } else {
+                // 第一、二、三關邏輯
+                // 先將全部顏色洗牌，確保每張卡用的底色或字絕對都不一樣
+                let shuffledColors = shuffleArray(COLORS);
+                let selectedBaseColors = shuffledColors.slice(0, numCards);
+                let availableMismatchColors = shuffledColors.slice(numCards); // 用剩下的顏色作為錯誤提示，確保畫面上毫無重複
+
+                for (let i = 0; i < numCards; i++) {
+                    let isTarget = (i === targetIndex); // target = 不相符的卡片
+                    let baseColor = selectedBaseColors[i];
+                    
+                    let bgHex = '#FFFFFF';
+                    let fontHex = baseColor.hex;
+                    let wordName = baseColor.name;
+
+                    if (currentLevel === 1) {
+                        // 第一關：白底。錯誤卡 = 字義與字色不同。正確卡 = 字義與字色相同。
+                        bgHex = '#FFFFFF';
+                        if (isTarget) {
+                            wordName = baseColor.name;
+                            fontHex = availableMismatchColors[0].hex; // 選一個與其他卡絕對不同的顏色
+                        } else {
+                            wordName = baseColor.name;
+                            fontHex = baseColor.hex;
+                        }
+                    } else {
+                        // 第二、三關：彩底白字。錯誤卡 = 字義與底色不同。正確卡 = 字義與底色相同。
+                        fontHex = '#FFFFFF';
+                        if (isTarget) {
+                            bgHex = baseColor.hex;
+                            wordName = availableMismatchColors[0].name; // 選一個與其他卡絕對不同的字
+                        } else {
+                            bgHex = baseColor.hex;
+                            wordName = baseColor.name;
+                        }
+                    }
+
+                    cardsData.push({
+                        isTarget: isTarget,
+                        bgHex: bgHex,
+                        fontHex: fontHex,
+                        wordName: wordName
+                    });
+                }
+            }
+            
+            // 啟動計時挑戰
+            startTimer();
+
+            // 渲染卡牌
+            cardsData.forEach((data, index) => {
+                // 卡牌外框
+                const card = document.createElement('div');
+                let cardSizeClasses = currentLevel === 4 
+                    ? `w-[45%] sm:w-auto min-h-[180px] sm:min-h-[250px] flex-1 max-w-[300px]` 
+                    : `w-full sm:w-auto min-h-[250px] sm:min-h-[350px] flex-1 max-w-[400px]`;
+
+                card.className = `card-pop relative flex items-center justify-center rounded-[2rem] shadow-xl border-8 border-gray-200 overflow-hidden ${cardSizeClasses}`;
+                
+                if (currentLevel !== 4) {
+                    card.classList.add('cursor-pointer', 'active:scale-95', 'transition-transform');
+                }
+                
+                card.style.backgroundColor = data.bgHex;
+                card.style.animationDelay = `${index * 0.1}s`;
+
+                // 卡牌文字
+                const text = document.createElement('span');
+                text.innerText = data.wordName;
+                text.style.color = data.fontHex;
+                // 為了長輩閱讀，字體超級大
+                let textSizeClass = currentLevel === 4 ? `text-[80px] sm:text-[120px]` : `text-[120px] sm:text-[160px]`;
+                text.className = `${textSizeClass} font-black leading-none`; 
+                
+                // 若為白字，增加強烈陰影以對抗淺色背景（如黃色）
+                if (data.fontHex === '#FFFFFF') {
+                    text.classList.add('text-strong-shadow');
+                }
+                
+                card.appendChild(text);
+
+                // 結果覆蓋層 (O 或 X)
+                const overlay = document.createElement('div');
+                overlay.className = `absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none rounded-[1.5rem]`;
+                const icon = document.createElement('span');
+                icon.className = `text-[150px] sm:text-[200px] font-black leading-none drop-shadow-lg`;
+                overlay.appendChild(icon);
+                card.appendChild(overlay);
+
+                // 綁定點擊事件 (僅限 1~3 關)
+                if (currentLevel !== 4) {
+                    card.onclick = () => handleCardClick(card, data.isTarget, overlay, icon);
+                }
+                
+                container.appendChild(card);
+            });
+        }
+
+        function handleCardClick(cardElement, isTarget, overlay, icon) {
+            // 如果已經答對就不允許再點其他
+            if (isWaitingForNext) return; 
+
+            overlay.classList.remove('opacity-0');
+            
+            if (isTarget) {
+                // 只有在點擊正確答案時，才停止計時器
+                clearInterval(timerInterval);
+                
+                // 點擊正確 (找到不符的卡)
+                icon.innerText = '⭕';
+                icon.classList.add('text-green-500');
+                
+                // 新增正確答案框選的強調視覺 (粗綠框 + 外發光 + 放大)
+                cardElement.classList.add('anim-correct', 'ring-8', 'ring-green-500', 'ring-offset-4', 'scale-105', 'z-10');
+                cardElement.classList.replace('border-gray-200', 'border-green-500');
+                
+                isWaitingForNext = true;
+                
+                // 答對後，自動在 1.5 秒後換下一題
+                setTimeout(() => {
+                    nextQuestion();
+                }, 1500);
+            } else {
+                // 點擊錯誤
+                icon.innerText = '❌';
+                icon.classList.add('text-red-500');
+                cardElement.classList.add('anim-wrong');
+                
+                // 顯示一下錯誤圖示後隱藏，允許長輩繼續尋找正確答案 (計時器會繼續跑)
+                setTimeout(() => {
+                    overlay.classList.add('opacity-0');
+                    cardElement.classList.remove('anim-wrong');
+                    icon.classList.remove('text-red-500');
+                    document.getElementById('instruction-text').innerText = "點錯囉！請再試著找找看";
+                }, 800);
+            }
+        }
+    </script>
+</body>
+</html>
